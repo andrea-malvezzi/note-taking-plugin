@@ -2,8 +2,11 @@ import { Plugin, Editor } from "obsidian";
 
 /* TODO: add support for:
  * - $ auto-closing feature;
- * - stackrel formula shortcut (maybe \defn ?)
- * - prg:[language extension] to create a coding tab for the specified language
+ * + stackrel formula shortcut (maybe \defn ?)
+ * + prg:[language extension] to create a coding tab for the specified language
+ * - optimize language extensions for the \prg: command by using a single case that automatically gets the correct language from the dictionary
+ * - keyboard shortcut to swap between open files
+ * - maybe a keyboard shortcut to open a file from the currently opened folder next to the current file?
 */ 
 
 /**
@@ -13,12 +16,28 @@ import { Plugin, Editor } from "obsidian";
  */
 export default class UniPlugin extends Plugin {
     private statusBarItem: HTMLElement | null = null;
+
+    private languages = {
+        "js"    : "js",
+        "py"    : "python",
+        "cpp"   : "cpp",
+        "java"  : "java",
+        "psc"   : "pseudocodice"
+    };
+
     private patterns = [
         /arr[0-9]/gi,           // arr[n].
         /m[0-9],[0-9]/gi,       // m[n],[m].
         /\\pars/gi,             // pars
-        /\\arr/gi,              // \begin{array}
-        /\\code/                // opens a code section with backticks
+        /\\code/gi,             // opens a code section with backticks (no language selected)
+        /\\prg:js/gi,           // opens a code section for js
+        /\\prg:py/gi,           // opens a code section for python
+        /\\prg:cpp/gi,          // opens a code section for cpp
+        /\\prg:java/gi,         // opens a code section for java
+        /\\prg:psc/gi,          // opens a code section for pseudocodice
+        /\\sys/gi,              // \begin{cases}\end{cases}
+        /\\defn/gi,             // \stackrel{}{}
+
     ];
 
     /**
@@ -104,13 +123,21 @@ export default class UniPlugin extends Plugin {
         this.patterns.forEach((pattern, index) => {
             let newWord = "";
             let startPos;
+            let newCursorPos;
+            let amount;
 
             if (wordBeforeCursor && pattern.test(wordBeforeCursor)) {
                 switch (index) {
                     case 0: // Handle "arr[n]"
-                        newWord = "\\begin{array}{" + 'c'.repeat(Number(wordBeforeCursor[wordBeforeCursor.length - 1]) - 1) + "|c}\\end{array}";
+                        amount = Number(wordBeforeCursor[wordBeforeCursor.length - 1]);
+                        newWord = "\\begin{array}{";   // if amount = 0, it will not write anything, leaving empty parenthesis.
+                        if (amount > 0)
+                            newWord = newWord  + 'c'.repeat(amount - 1) + "|c";
+                        newWord = newWord + "}\\end{array}";
                         startPos = { line: cursorPos.line, ch: cursorPos.ch - 4 };
                         editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line, ch: cursorPos.ch - (11 + 5) };
+                        editor.setCursor(newCursorPos);
                         break;
                     case 1: // Handle "m[n],m"
                         newWord = `M_{${Number(wordBeforeCursor[wordBeforeCursor.length - 3])},${Number(wordBeforeCursor[wordBeforeCursor.length - 1])}} = \\pmatrix{}`;
@@ -121,16 +148,64 @@ export default class UniPlugin extends Plugin {
                         newWord = "\\left(\\right)";
                         startPos = { line: cursorPos.line, ch: cursorPos.ch - 5 };
                         editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line, ch: cursorPos.ch - (7 + 5) };
+                        editor.setCursor(newCursorPos);
                         break;
-                    case 3: // Handle end array
-                        newWord = "\\begin{array}{}\\end{array}";
-                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 4 };
-                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
-                        break;
-                    case 4: // Handle code section
+                    case 3: // Handle code section
                         newWord = `\`\`\`\n\n\`\`\``;
                         startPos = { line: cursorPos.line, ch: cursorPos.ch - 5 };
                         editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line + 1, ch: 0 };
+                        editor.setCursor(newCursorPos);  
+                        break;
+                    case 4: // Handle \prg:js
+                        newWord = `\`\`\`js\n\n\`\`\``;
+                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 7 };
+                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line + 1, ch: 0 };
+                        editor.setCursor(newCursorPos);  
+                        break;
+                    case 5: // Handle \prg:py
+                        newWord = `\`\`\`python\n\n\`\`\``;
+                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 7 };
+                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line + 1, ch: 0 };
+                        editor.setCursor(newCursorPos);  
+                        break;
+                    case 6: // Handle \prg:cpp
+                        newWord = `\`\`\`cpp\n\n\`\`\``;
+                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 8 };
+                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line + 1, ch: 0 };
+                        editor.setCursor(newCursorPos);  
+                        break;
+                    case 7: // Handle \prg:java
+                        newWord = `\`\`\`java\n\n\`\`\``;
+                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 9 };
+                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line + 1, ch: 0 };
+                        editor.setCursor(newCursorPos);  
+                        break;
+                    case 8: // Handle \prg:psc
+                        newWord = `\`\`\`pseudocodice\n\n\`\`\``;
+                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 8 };
+                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line + 1, ch: 0 };
+                        editor.setCursor(newCursorPos);  
+                        break;
+                    case 9: // Handle \sys
+                        newWord = "\\begin{cases}\\end{cases}";
+                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 4 };
+                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line, ch: cursorPos.ch - (10 + 5) };
+                        editor.setCursor(newCursorPos);
+                        break;
+                    case 10:
+                        newWord = "\\stackrel{}{}";
+                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 5 };
+                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        newCursorPos = { line: cursorPos.line, ch: cursorPos.ch - (3 + 5) };
+                        editor.setCursor(newCursorPos);
                         break;
                 }
             }
