@@ -17,7 +17,8 @@ export default class UniPlugin extends Plugin {
         /arr[0-9]/gi,           // arr[n].
         /m[0-9],[0-9]/gi,       // m[n],[m].
         /\\pars/gi,             // pars
-        /\\arr/gi               // \begin{array}
+        /\\arr/gi,              // \begin{array}
+        /\\code/                // opens a code section with backticks
     ];
 
     /**
@@ -124,6 +125,11 @@ export default class UniPlugin extends Plugin {
                     case 3: // Handle end array
                         newWord = "\\begin{array}{}\\end{array}";
                         startPos = { line: cursorPos.line, ch: cursorPos.ch - 4 };
+                        editor.getDoc().replaceRange(newWord, startPos, cursorPos);
+                        break;
+                    case 4: // Handle code section
+                        newWord = `\`\`\`\n\n\`\`\``;
+                        startPos = { line: cursorPos.line, ch: cursorPos.ch - 5 };
                         editor.getDoc().replaceRange(newWord, startPos, cursorPos);
                         break;
                 }
